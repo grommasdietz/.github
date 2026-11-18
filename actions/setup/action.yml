@@ -23,10 +23,23 @@ inputs:
   browsers:
     description: Playwright browsers to install, separated by spaces
     default: ''
+  apt:
+    description: Ubuntu packages the checks need, separated by spaces
+    default: ''
 
 runs:
   using: composite
   steps:
+    - name: Install system packages
+      if: inputs.apt != ''
+      shell: bash
+      env:
+        PACKAGES: ${{ inputs.apt }}
+      run: |
+        read -ra packages <<< "$PACKAGES"
+        sudo apt-get update -q
+        sudo apt-get install -y -q "${packages[@]}"
+
     - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
       with:
         php-version: ${{ inputs.php }}

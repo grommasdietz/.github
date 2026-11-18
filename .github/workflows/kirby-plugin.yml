@@ -18,6 +18,10 @@ on:
         description: Playwright browsers to install before pnpm verify
         type: string
         default: ''
+      apt:
+        description: Ubuntu packages the checks need, separated by spaces
+        type: string
+        default: ''
       compatibility:
         description: 'JSON list of compatibility runs: {"php": "8.5", "kirby": "6.0.0", "composer": "playground", "command": "...", "name": "..."}'
         type: string
@@ -52,6 +56,7 @@ jobs:
           php: ${{ inputs.php }}
           extensions: ${{ inputs.extensions }}
           browsers: ${{ inputs.browsers }}
+          apt: ${{ inputs.apt }}
           composer-token: ${{ secrets.GH_COMPOSER_TOKEN }}
       - name: composer verify
         run: composer verify
@@ -96,6 +101,7 @@ jobs:
           composer: ${{ matrix.composer || 'all' }}
           composer-token: ${{ secrets.GH_COMPOSER_TOKEN }}
           kirby: ${{ matrix.kirby || '' }}
+          apt: ${{ inputs.apt }}
           node: 'false'
       - name: Run compatibility command
         env:
