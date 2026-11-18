@@ -1,0 +1,162 @@
+name: Kirby plugin
+
+# Shared CI for grommasdietz Kirby plugins. A repository's own `composer verify` and `pnpm verify`
+# define what is checked, so local verification and CI run the same commands.
+
+on:
+  workflow_call:
+    inputs:
+      php:
+        description: PHP version for verification and releases
+        type: string
+        default: '8.3'
+      extensions:
+        description: PHP extensions
+        type: string
+        default: curl, dom, gd, intl, json, mbstring, simplexml, zip
+      browsers:
+        description: Playwright browsers to install before pnpm verify
+        type: string
+        default: ''
+      compatibility:
+        description: 'JSON list of compatibility runs: {"php": "8.5", "kirby": "6.0.0", "composer": "playground", "command": "..."}'
+        type: string
+        default: '[]'
+      compatibility-command:
+        description: Command for compatibility runs without their own command
+        type: string
+        default: composer test
+      release:
+        description: Publish with Semantic Release after verification on the default branch
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: verify-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: grommasdietz/.github/actions/setup@v1
+        with:
+          php: ${{ inputs.php }}
+          extensions: ${{ inputs.extensions }}
+          browsers: ${{ inputs.browsers }}
+          composer-token: ${{ secrets.GH_COMPOSER_TOKEN }}
+      - name: composer verify
+        run: composer verify
+      - name: pnpm verify
+        if: hashFiles('package.json') != ''
+        run: pnpm verify
+      - uses: grommasdietz/.github/actions/commitlint@v1
+        if: hashFiles('package.json') != ''
+      - name: Validate workflows
+        run: docker run --rm --network none --volume "$PWD:/repo:ro" --workdir /repo rhysd/actionlint:1.7.12 -color
+      - name: Keep browser test reports
+        if: failure() && inputs.browsers != ''
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 3
+
+  compatibility:
+    name: PHP ${{ matrix.php }}${{ matrix.kirby && format(' · Kirby {0}', matrix.kirby) || '' }}
+    if: inputs.compatibility != '[]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: compatibility-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ matrix.php }}-${{ matrix.kirby }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(inputs.compatibility) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: grommasdietz/.github/actions/setup@v1
+        with:
+          php: ${{ matrix.php }}
+          extensions: ${{ inputs.extensions }}
+          composer: ${{ matrix.composer || 'all' }}
+          composer-token: ${{ secrets.GH_COMPOSER_TOKEN }}
+          kirby: ${{ matrix.kirby || '' }}
+          node: 'false'
+      - name: Run compatibility command
+        env:
+          COMMAND: ${{ matrix.command || inputs.compatibility-command }}
+        run: bash -euo pipefail -c "$COMMAND"
+
+  release:
+    name: Release
+    needs: [verify, compatibility]
+    if: >-
+      !cancelled() && inputs.release && needs.verify.result == 'success' &&
+      contains(fromJSON('["success", "skipped"]'), needs.compatibility.result) &&
+      contains(fromJSON('["push", "workflow_dispatch"]'), github.event_name) &&
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    concurrency:
+      group: release-${{ github.repository }}
+      cancel-in-progress: false
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Create release app token
+        id: app
+        if: vars.GD_RELEASE_BOT_CLIENT_ID != ''
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3
+        with:
+          client-id: ${{ vars.GD_RELEASE_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.GD_RELEASE_BOT_PRIVATE_KEY }}
+          permission-contents: write
+          permission-issues: write
+          permission-pull-requests: write
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+          token: ${{ steps.app.outputs.token || github.token }}
+      - uses: grommasdietz/.github/actions/setup@v1
+        with:
+          php: ${{ inputs.php }}
+          composer: none
+      - name: Semantic Release
+        run: pnpm exec semantic-release
+        env:
+          GITHUB_TOKEN: ${{ steps.app.outputs.token || github.token }}
+
+  dependabot:
+    name: Merge Dependabot update
+    needs: [verify, compatibility]
+    if: >-
+      !cancelled() && needs.verify.result == 'success' &&
+      contains(fromJSON('["success", "skipped"]'), needs.compatibility.result) &&
+      github.event_name == 'pull_request' && github.actor == 'dependabot[bot]' &&
+      github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: grommasdietz/.github/actions/dependabot-merge@v1

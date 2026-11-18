@@ -1,0 +1,136 @@
+name: Kirby site
+
+# Shared CI for grommasdietz Kirby websites. `pnpm verify` and `composer verify` define the checks.
+# On the default branch it can also build the deploy bundle that grommasdietz/kirby-deploy stages.
+
+on:
+  workflow_call:
+    inputs:
+      php:
+        description: PHP version for verification and the deploy bundle
+        type: string
+        default: '8.3'
+      php-extra:
+        description: Additional PHP version that runs composer verify again
+        type: string
+        default: ''
+      bundle:
+        description: Build the deploy bundle after verification on the default branch
+        type: boolean
+        default: false
+    outputs:
+      bundle:
+        description: Whether the deploy-htdocs artifact was uploaded
+        value: ${{ jobs.verify.outputs.bundle }}
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    concurrency:
+      group: verify-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+    outputs:
+      bundle: ${{ steps.upload.outcome == 'success' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: grommasdietz/.github/actions/setup@v1
+        with:
+          php: ${{ inputs.php }}
+          composer-token: ${{ secrets.GH_COMPOSER_TOKEN }}
+      - name: pnpm verify
+        run: pnpm verify
+      - name: composer verify
+        run: composer verify
+      - uses: grommasdietz/.github/actions/commitlint@v1
+      - name: Validate workflows
+        run: docker run --rm --network none --volume "$PWD:/repo:ro" --workdir /repo rhysd/actionlint:1.7.12 -color
+
+      - uses: grommasdietz/.github/actions/setup@v1
+        if: inputs.php-extra != ''
+        with:
+          php: ${{ inputs.php-extra }}
+          node: 'false'
+      - name: composer verify (PHP ${{ inputs.php-extra }})
+        if: inputs.php-extra != ''
+        run: composer verify
+
+      - name: Decide whether the change needs a deploy
+        id: deploy
+        if: >-
+          inputs.bundle && contains(fromJSON('["push", "workflow_dispatch"]'), github.event_name) &&
+          github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          # Documentation and automation-only pushes skip staging; anything unknown deploys.
+          if [[ "$BEFORE" =~ ^[0-9a-f]{40}$ && "$BEFORE" != 0000000000000000000000000000000000000000 ]] \
+            && changed=$(git diff --name-only "$BEFORE" HEAD --) \
+            && ! grep -qvE '(^docs/|^\.github/|\.md$)' <<< "$changed"; then
+            echo "Only documentation or automation changed; skipping the deploy bundle."
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: grommasdietz/.github/actions/setup@v1
+        if: steps.deploy.outputs.needed == 'true' && inputs.php-extra != ''
+        with:
+          php: ${{ inputs.php }}
+          composer: none
+          node: 'false'
+      - name: Build production bundle
+        if: steps.deploy.outputs.needed == 'true'
+        env:
+          ENABLE_CRITICAL_CSS: ${{ vars.ENABLE_CRITICAL_CSS }}
+          CRITICAL_CSS_BASE_URL: ${{ vars.CRITICAL_CSS_BASE_URL }}
+        run: |
+          composer install --no-dev --no-interaction --prefer-dist --no-progress --optimize-autoloader
+          case "$(printf '%s' "${ENABLE_CRITICAL_CSS:-false}" | tr '[:upper:]' '[:lower:]')" in
+            1|true|yes|on)
+              if [ -z "${CRITICAL_CSS_BASE_URL:-}" ]; then
+                echo "ENABLE_CRITICAL_CSS requires CRITICAL_CSS_BASE_URL." >&2
+                exit 1
+              fi
+              pnpm critical
+              ;;
+            ''|0|false|no|off) echo "Using the assets built by pnpm verify." ;;
+            *) echo "Unsupported ENABLE_CRITICAL_CSS value." >&2; exit 1 ;;
+          esac
+          # Private data stays on the server; excludes are anchored to the htdocs root.
+          rm -rf .deploy
+          mkdir -p .deploy
+          rsync -a htdocs/ .deploy/htdocs/ \
+            --exclude '.DS_Store' --exclude '/.env' --exclude '/data/' \
+            --exclude '/public/hot' --exclude '/public/media/'
+          tar -czf .deploy/htdocs.tar.gz -C .deploy htdocs
+      - name: Upload deploy bundle
+        id: upload
+        if: steps.deploy.outputs.needed == 'true'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: deploy-htdocs
+          path: .deploy/htdocs.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+
+  dependabot:
+    name: Merge Dependabot update
+    needs: verify
+    if: >-
+      github.event_name == 'pull_request' && github.actor == 'dependabot[bot]' &&
+      github.event.pull_request.user.login == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: grommasdietz/.github/actions/dependabot-merge@v1

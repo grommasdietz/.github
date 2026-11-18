@@ -1,0 +1,24 @@
+name: Check Conventional Commits
+description: Lint the pull request title and the new commits with the repository's commitlint configuration.
+
+runs:
+  using: composite
+  steps:
+    - name: Lint pull request title and commits
+      if: hashFiles('commitlint.config.*', '.commitlintrc*') != '' && github.actor != 'dependabot[bot]'
+      shell: bash
+      env:
+        EVENT: ${{ github.event_name }}
+        TITLE: ${{ github.event.pull_request.title }}
+        BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+      run: |
+        if [ "$EVENT" = pull_request ]; then
+          printf '%s\n' "$TITLE" | pnpm exec commitlint
+        fi
+        if [[ "$BASE" =~ ^[0-9a-f]{40}$ && "$BASE" != 0000000000000000000000000000000000000000 ]] \
+          && git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+          pnpm exec commitlint --from "$BASE" --to "$HEAD"
+        else
+          pnpm exec commitlint --from "$HEAD~1" --to "$HEAD"
+        fi

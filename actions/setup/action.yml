@@ -1,0 +1,105 @@
+name: Set up Kirby project
+description: Install PHP, Composer and pnpm dependencies the same way a local checkout does.
+
+inputs:
+  php:
+    description: PHP version
+    default: '8.3'
+  extensions:
+    description: PHP extensions
+    default: curl, dom, gd, intl, json, mbstring, simplexml, zip
+  composer:
+    description: 'Composer scope: all (playground and root), playground or none'
+    default: all
+  composer-token:
+    description: Token for private grommasdietz Composer packages
+    default: ''
+  kirby:
+    description: Kirby version to require instead of the locked one, for compatibility runs
+    default: ''
+  node:
+    description: Install pnpm dependencies when package.json exists
+    default: 'true'
+  browsers:
+    description: Playwright browsers to install, separated by spaces
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2
+      with:
+        php-version: ${{ inputs.php }}
+        extensions: ${{ inputs.extensions }}
+        coverage: none
+        tools: composer:v2
+
+    - name: Authenticate private Composer packages
+      if: inputs.composer-token != ''
+      shell: bash
+      env:
+        TOKEN: ${{ inputs.composer-token }}
+      run: |
+        composer config --global github-oauth.github.com "$TOKEN"
+        git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
+
+    - name: Locate Composer cache
+      if: inputs.composer != 'none'
+      id: composer-cache
+      shell: bash
+      run: echo "dir=$(composer config --global cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+    - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+      if: inputs.composer != 'none'
+      with:
+        path: ${{ steps.composer-cache.outputs.dir }}
+        key: ${{ runner.os }}-composer-${{ inputs.php }}-${{ hashFiles('composer.lock', 'playground/composer.lock') }}
+        restore-keys: ${{ runner.os }}-composer-${{ inputs.php }}-
+
+    - name: Install Composer dependencies
+      if: inputs.composer != 'none'
+      shell: bash
+      env:
+        SCOPE: ${{ inputs.composer }}
+        KIRBY: ${{ inputs.kirby }}
+      run: |
+        flags=(--no-interaction --prefer-dist --no-progress)
+        if [ -f playground/composer.json ]; then
+          composer install -d playground "${flags[@]}"
+        fi
+        if [ "$SCOPE" = playground ]; then
+          exit 0
+        fi
+        if [ -z "$KIRBY" ]; then
+          composer install "${flags[@]}"
+          exit 0
+        fi
+        composer config platform.php "$(php -r 'echo PHP_VERSION;')"
+        composer require --dev "getkirby/cms:$KIRBY" --with-all-dependencies --no-scripts "${flags[@]}"
+        echo "KIRBY_TEST_MAJOR=${KIRBY%%.*}" >> "$GITHUB_ENV"
+
+    - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
+      if: inputs.node == 'true' && hashFiles('package.json') != ''
+
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+      if: inputs.node == 'true' && hashFiles('package.json') != ''
+      with:
+        node-version-file: ${{ hashFiles('.node-version') != '' && '.node-version' || '' }}
+        node-version: ${{ hashFiles('.node-version') == '' && '24' || '' }}
+        cache: pnpm
+
+    - name: Install pnpm dependencies
+      if: inputs.node == 'true' && hashFiles('package.json') != ''
+      shell: bash
+      env:
+        HUSKY: '0'
+      run: pnpm install --frozen-lockfile
+
+    - name: Install Playwright browsers
+      if: inputs.node == 'true' && inputs.browsers != ''
+      shell: bash
+      env:
+        BROWSERS: ${{ inputs.browsers }}
+      run: |
+        read -ra browsers <<< "$BROWSERS"
+        pnpm exec playwright install --with-deps "${browsers[@]}"
