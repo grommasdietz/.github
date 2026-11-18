@@ -19,7 +19,7 @@ on:
         type: string
         default: ''
       compatibility:
-        description: 'JSON list of compatibility runs: {"php": "8.5", "kirby": "6.0.0", "composer": "playground", "command": "..."}'
+        description: 'JSON list of compatibility runs: {"php": "8.5", "kirby": "6.0.0", "composer": "playground", "command": "...", "name": "..."}'
         type: string
         default: '[]'
       compatibility-command:
@@ -74,12 +74,12 @@ jobs:
           retention-days: 3
 
   compatibility:
-    name: PHP ${{ matrix.php }}${{ matrix.kirby && format(' · Kirby {0}', matrix.kirby) || '' }}
+    name: ${{ matrix.name || format('PHP {0}{1}', matrix.php, matrix.kirby && format(' · Kirby {0}', matrix.kirby) || '') }}
     if: inputs.compatibility != '[]'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     concurrency:
-      group: compatibility-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ matrix.php }}-${{ matrix.kirby }}
+      group: compatibility-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ matrix.name }}-${{ matrix.php }}-${{ matrix.kirby }}
       cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     strategy:
       fail-fast: false

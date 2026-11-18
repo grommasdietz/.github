@@ -27,14 +27,14 @@ jobs:
     secrets: inherit
 ```
 
-| Input                   | Default                 | Purpose                                                                                                                                         |
-| ----------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `php`                   | `8.3`                   | PHP version for `composer verify`, `pnpm verify` and releases                                                                                   |
-| `extensions`            | common Kirby extensions | PHP extensions                                                                                                                                  |
-| `browsers`              | none                    | Playwright browsers installed before `pnpm verify`, for example `chromium webkit`                                                               |
-| `compatibility`         | `[]`                    | JSON list of extra runs. Each entry takes `php` and optionally `kirby` (a version to require), `composer` (`all` or `playground`) and `command` |
-| `compatibility-command` | `composer test`         | Command for entries without their own `command`. Kirby runs also get `KIRBY_TEST_MAJOR`                                                         |
-| `release`               | `true`                  | Run Semantic Release on the default branch after all checks pass                                                                                |
+| Input                   | Default                 | Purpose                                                                                                                                                                                               |
+| ----------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `php`                   | `8.3`                   | PHP version for `composer verify`, `pnpm verify` and releases                                                                                                                                         |
+| `extensions`            | common Kirby extensions | PHP extensions                                                                                                                                                                                        |
+| `browsers`              | none                    | Playwright browsers installed before `pnpm verify`, for example `chromium webkit`                                                                                                                     |
+| `compatibility`         | `[]`                    | JSON list of extra runs. Each entry takes `php` and optionally `kirby` (a version to require), `composer` (`all`, `playground` or `none`), `command` and `name` (the check name, default `PHP <php>`) |
+| `compatibility-command` | `composer test`         | Command for entries without their own `command`. Kirby runs also get `KIRBY_TEST_MAJOR`                                                                                                               |
+| `release`               | `true`                  | Run Semantic Release on the default branch after all checks pass                                                                                                                                      |
 
 Releases use the GitHub App from `vars.GD_RELEASE_BOT_CLIENT_ID` and `secrets.GD_RELEASE_BOT_PRIVATE_KEY` when configured, otherwise the workflow token. Gate publishing with `release: ${{ vars.RELEASE_ENABLED == 'true' }}` when a repository should not publish yet.
 
