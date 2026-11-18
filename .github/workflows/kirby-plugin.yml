@@ -23,7 +23,7 @@ on:
         type: string
         default: ''
       compatibility:
-        description: 'JSON list of compatibility runs: {"php": "8.5", "kirby": "6.0.0", "composer": "playground", "command": "...", "name": "..."}'
+        description: 'JSON list of runs with php and optional kirby, composer, command, name, ref, node and browsers'
         type: string
         default: '[]'
       compatibility-command:
@@ -86,7 +86,7 @@ jobs:
     name: ${{ matrix.name || format('PHP {0}{1}', matrix.php, matrix.kirby && format(' · Kirby {0}', matrix.kirby) || '') }}
     if: inputs.compatibility != '[]'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     concurrency:
       group: compatibility-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}-${{ matrix.name }}-${{ matrix.php }}-${{ matrix.kirby }}
       cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -97,6 +97,8 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
+          ref: ${{ matrix.ref || github.sha }}
+          fetch-depth: 0
           persist-credentials: false
       - uses: grommasdietz/.github/actions/setup@v1
         with:
@@ -106,7 +108,8 @@ jobs:
           composer-token: ${{ secrets.GH_COMPOSER_TOKEN }}
           kirby: ${{ matrix.kirby || '' }}
           apt: ${{ inputs.apt }}
-          node: 'false'
+          node: ${{ matrix.node && 'true' || 'false' }}
+          browsers: ${{ matrix.browsers || '' }}
       - name: Run compatibility command
         env:
           COMMAND: ${{ matrix.command || inputs.compatibility-command }}

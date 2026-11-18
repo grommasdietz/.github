@@ -23,19 +23,23 @@ jobs:
       pull-requests: write
     with:
       php: '8.3'
-      compatibility: '[{"php": "8.2", "composer": "playground", "command": "composer test:smoke"}, {"php": "8.3", "kirby": "6.0.0-beta.3"}]'
+      compatibility: '[{"php": "8.2", "composer": "playground", "command": "composer test:smoke"}, {"php": "8.3", "kirby": "6.0.0-rc.1"}]'
     secrets: inherit
 ```
 
-| Input                   | Default                 | Purpose                                                                                                                                                                                               |
-| ----------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `php`                   | `8.3`                   | PHP version for `composer verify`, `pnpm verify` and releases                                                                                                                                         |
-| `extensions`            | common Kirby extensions | PHP extensions                                                                                                                                                                                        |
-| `browsers`              | none                    | Playwright browsers installed before `pnpm verify`, for example `chromium webkit`                                                                                                                     |
-| `apt`                   | none                    | Ubuntu packages installed before the checks, for example `imagemagick`                                                                                                                                |
-| `compatibility`         | `[]`                    | JSON list of extra runs. Each entry takes `php` and optionally `kirby` (a version to require), `composer` (`all`, `playground` or `none`), `command` and `name` (the check name, default `PHP <php>`) |
-| `compatibility-command` | `composer test`         | Command for entries without their own `command`. Kirby runs also get `KIRBY_TEST_MAJOR`                                                                                                               |
-| `release`               | `true`                  | Run Semantic Release on the default branch after all checks pass                                                                                                                                      |
+| Input                   | Default                 | Purpose                                                                                                                                                                                                                             |
+| ----------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `php`                   | `8.3`                   | PHP version for `composer verify`, `pnpm verify` and releases                                                                                                                                                                       |
+| `extensions`            | common Kirby extensions | PHP extensions                                                                                                                                                                                                                      |
+| `browsers`              | none                    | Playwright browsers installed before `pnpm verify`, for example `chromium webkit`                                                                                                                                                   |
+| `apt`                   | none                    | Ubuntu packages installed before the checks, for example `imagemagick`                                                                                                                                                              |
+| `compatibility`         | `[]`                    | JSON list of extra runs. Each entry takes `php` and optionally `kirby` (a version to require), `composer` (`all`, `playground` or `none`), `command`, `name`, `ref`, `node` and `browsers` (the check name defaults to `PHP <php>`) |
+| `compatibility-command` | `composer test`         | Command for entries without their own `command`. Kirby runs also get `KIRBY_TEST_MAJOR`                                                                                                                                             |
+| `release`               | `true`                  | Run Semantic Release on the default branch after all checks pass                                                                                                                                                                    |
+
+A Kirby override updates every existing CMS requirement in the selected Composer scope, including the playground used by integration tests. It does not add an unused second CMS to a root tooling manifest. Without an override, installs remain frozen to their lockfiles.
+
+A compatibility entry can check a dedicated native Kirby 6 branch with `ref: "compat/kirby-6"`, `node: true`, `browsers: "chromium"` and `command: "composer verify && pnpm verify"`. Give it a clear name such as `Kirby 6 branch`: this tests that branch's current commit, while the normal Verify job tests the calling push or pull request. Release and Dependabot jobs remain bound to the caller's default-branch verification.
 
 Releases use the GitHub App from `vars.GD_RELEASE_BOT_CLIENT_ID` and `secrets.GD_RELEASE_BOT_PRIVATE_KEY` when configured, otherwise the workflow token. Gate publishing with `release: ${{ vars.RELEASE_ENABLED == 'true' }}` when a repository should not publish yet.
 

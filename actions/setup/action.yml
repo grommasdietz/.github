@@ -75,21 +75,7 @@ runs:
       env:
         SCOPE: ${{ inputs.composer }}
         KIRBY: ${{ inputs.kirby }}
-      run: |
-        flags=(--no-interaction --prefer-dist --no-progress)
-        if [ -f playground/composer.json ]; then
-          composer install -d playground "${flags[@]}"
-        fi
-        if [ "$SCOPE" = playground ]; then
-          exit 0
-        fi
-        if [ -z "$KIRBY" ]; then
-          composer install "${flags[@]}"
-          exit 0
-        fi
-        composer config platform.php "$(php -r 'echo PHP_VERSION;')"
-        composer require --dev "getkirby/cms:$KIRBY" --with-all-dependencies --no-scripts "${flags[@]}"
-        echo "KIRBY_TEST_MAJOR=${KIRBY%%.*}" >> "$GITHUB_ENV"
+      run: bash "$GITHUB_ACTION_PATH/install-composer.sh"
 
     - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
       if: inputs.node == 'true' && hashFiles('package.json') != ''
