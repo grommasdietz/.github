@@ -4,6 +4,11 @@ description: >-
   and pre-releases stay manual. The merge commit is verified again by dispatching the caller workflow on
   the default branch, because merges made with the workflow token do not trigger push runs.
 
+inputs:
+  minor:
+    description: Also merge minor updates of stable packages
+    default: 'true'
+
 runs:
   using: composite
   steps:
@@ -19,13 +24,15 @@ runs:
         BRANCH: ${{ github.event.repository.default_branch }}
         UPDATE: ${{ steps.metadata.outputs.update-type }}
         DEPENDENCIES: ${{ steps.metadata.outputs.updated-dependencies-json }}
+        MINOR: ${{ inputs.minor }}
       run: |
         manual=$(jq -r '[.[] | select(
             (.newVersion // "" | test("-")) or
             (.updateType == "version-update:semver-minor" and (.prevVersion // "0" | test("^v?0\\.")))
           )] | length' <<< "$DEPENDENCIES")
         case "$UPDATE" in
-          version-update:semver-patch|version-update:semver-minor) ;;
+          version-update:semver-patch) ;;
+          version-update:semver-minor) [ "$MINOR" = true ] || manual=1 ;;
           *) manual=1 ;;
         esac
         if [ "$manual" != 0 ]; then

@@ -34,6 +34,10 @@ on:
         description: Publish with Semantic Release after verification on the default branch
         type: boolean
         default: true
+      dependabot-minor:
+        description: Auto-merge minor updates of stable packages; patches always qualify
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -166,3 +170,5 @@ jobs:
       pull-requests: write
     steps:
       - uses: grommasdietz/.github/actions/dependabot-merge@v1
+        with:
+          minor: ${{ inputs.dependabot-minor }}

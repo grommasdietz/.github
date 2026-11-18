@@ -61,7 +61,7 @@ The job runs `pnpm verify`, then `composer verify`, and repeats `composer verify
 
 - **Conventional Commits:** pull request titles and new commits are linted with the repository's commitlint configuration. Dependabot is exempt.
 - **Workflows:** Actionlint validates every workflow.
-- **Dependabot:** after all checks pass in the same run, patch updates and minor updates of stable packages are squash-merged. Majors, pre-1.0 minors and pre-releases stay open for review. The default branch is then verified again by dispatching the caller workflow, which needs a `workflow_dispatch` trigger.
+- **Dependabot:** after all checks pass in the same run, patch updates and minor updates of stable packages are squash-merged. Majors, pre-1.0 minors and pre-releases stay open for review. Set `dependabot-minor: false` to merge only patches automatically. The default branch is then verified again by dispatching the caller workflow, which needs a `workflow_dispatch` trigger.
 - **Private packages:** `secrets.GH_COMPOSER_TOKEN` authenticates private Composer packages. Add it as an Actions secret and as a Dependabot secret.
 
 ## Changing these workflows

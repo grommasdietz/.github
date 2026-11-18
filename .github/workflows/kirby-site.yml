@@ -18,6 +18,10 @@ on:
         description: Build the deploy bundle after verification on the default branch
         type: boolean
         default: false
+      dependabot-minor:
+        description: Auto-merge minor updates of stable packages; patches always qualify
+        type: boolean
+        default: true
     outputs:
       bundle:
         description: Whether the deploy-htdocs artifact was uploaded
@@ -134,3 +138,5 @@ jobs:
       pull-requests: write
     steps:
       - uses: grommasdietz/.github/actions/dependabot-merge@v1
+        with:
+          minor: ${{ inputs.dependabot-minor }}
