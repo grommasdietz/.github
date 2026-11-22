@@ -39,12 +39,12 @@ else: raise AssertionError(operation)
 ''')
         composer.chmod(0o700)
         self.environment = dict(os.environ, PATH=str(binary) + os.pathsep + os.environ['PATH'],
-                                GITHUB_ENV=str(self.root / 'environment'), KIRBY='6.0.0-rc.1')
+                                GITHUB_ENV=str(self.root / 'environment'), KIRBY='6.0.0-rc.3')
 
     def manifest(self, directory, value):
         (self.root / directory / 'composer.json').write_text(json.dumps(value))
 
-    def run_setup(self, scope='all', version='6.0.0-rc.1'):
+    def run_setup(self, scope='all', version='6.0.0-rc.3'):
         return subprocess.run(['bash', str(SCRIPT)], cwd=str(self.root),
                               env=dict(self.environment, SCOPE=scope, KIRBY=version),
                               stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
@@ -53,12 +53,12 @@ else: raise AssertionError(operation)
         result = self.run_setup()
         self.assertEqual(result.returncode, 0, result.stderr)
         for directory in ['.', 'playground']:
-            self.assertEqual((self.root / directory / 'installed-kirby').read_text(), '6.0.0-rc.1')
+            self.assertEqual((self.root / directory / 'installed-kirby').read_text(), '6.0.0-rc.3')
         self.assertEqual((self.root / 'environment').read_text(), 'KIRBY_TEST_MAJOR=6\n')
 
     def test_playground_scope_changes_the_runtime_without_installing_root_tools(self):
         self.assertEqual(self.run_setup('playground').returncode, 0)
-        self.assertEqual((self.root / 'playground/installed-kirby').read_text(), '6.0.0-rc.1')
+        self.assertEqual((self.root / 'playground/installed-kirby').read_text(), '6.0.0-rc.3')
         self.assertFalse((self.root / 'installed-kirby').exists())
 
     def test_no_override_keeps_the_locked_manifest_constraints(self):
@@ -70,7 +70,7 @@ else: raise AssertionError(operation)
         self.manifest('.', {'require-dev': {'phpunit/phpunit': '^12'}})
         self.assertEqual(self.run_setup().returncode, 0)
         self.assertEqual((self.root / 'installed-kirby').read_text(), 'none')
-        self.assertEqual((self.root / 'playground/installed-kirby').read_text(), '6.0.0-rc.1')
+        self.assertEqual((self.root / 'playground/installed-kirby').read_text(), '6.0.0-rc.3')
 
 
 if __name__ == '__main__':

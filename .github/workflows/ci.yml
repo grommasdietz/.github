@@ -43,9 +43,9 @@ jobs:
       - uses: ./actions/setup
         with:
           php: '8.3'
-          kirby: '6.0.0-rc.1'
+          kirby: '6.0.0-rc.3'
           node: 'false'
       - name: Assert both installed runtimes use the requested Kirby
         run: |
-          php -r 'require "vendor/autoload.php"; if (Composer\InstalledVersions::getPrettyVersion("getkirby/cms") !== "6.0.0-rc.1") exit(1);'
-          php -r 'require "playground/vendor/autoload.php"; if (Composer\InstalledVersions::getPrettyVersion("getkirby/cms") !== "6.0.0-rc.1") exit(1);'
+          php -r 'require "vendor/autoload.php"; if (Composer\InstalledVersions::getPrettyVersion("getkirby/cms") !== "6.0.0-rc.3") exit(1);'
+          php -r 'require "playground/vendor/autoload.php"; if (Composer\InstalledVersions::getPrettyVersion("getkirby/cms") !== "6.0.0-rc.3") exit(1);'
