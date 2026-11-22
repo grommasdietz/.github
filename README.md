@@ -23,7 +23,7 @@ jobs:
       pull-requests: write
     with:
       php: '8.3'
-      compatibility: '[{"php": "8.2", "composer": "playground", "command": "composer test:smoke"}, {"php": "8.3", "kirby": "6.0.0-rc.1"}]'
+      compatibility: '[{"php": "8.2", "composer": "playground", "command": "composer test:smoke"}, {"php": "8.3", "kirby": "6.0.0-rc.3"}]'
     secrets: inherit
 ```
 
@@ -39,7 +39,7 @@ jobs:
 
 A Kirby override updates every existing CMS requirement in the selected Composer scope, including the playground used by integration tests. It does not add an unused second CMS to a root tooling manifest. Without an override, installs remain frozen to their lockfiles.
 
-A compatibility entry can check a dedicated native Kirby 6 branch with `ref: "compat/kirby-6"`, `node: true`, `browsers: "chromium"` and `command: "composer verify && pnpm verify"`. Give it a clear name such as `Kirby 6 branch`: this tests that branch's current commit, while the normal Verify job tests the calling push or pull request. Release and Dependabot jobs remain bound to the caller's default-branch verification.
+A compatibility entry can check a dedicated native Kirby 6 branch with `ref: "kirby-6"`, `node: true`, `browsers: "chromium"` and `command: "composer verify && pnpm verify"`. Give it a clear name such as `Kirby 6 branch`: this tests that branch's current commit, while the normal Verify job tests the calling push or pull request. Release and Dependabot jobs remain bound to the caller's default-branch verification.
 
 Releases use the GitHub App from `vars.GD_RELEASE_BOT_CLIENT_ID` and `secrets.GD_RELEASE_BOT_PRIVATE_KEY` when configured, otherwise the workflow token. Gate publishing with `release: ${{ vars.RELEASE_ENABLED == 'true' }}` when a repository should not publish yet.
 
